@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Elevator Mobile Prototype</title>
+<title>Elevator 15-Floor Advanced Prototype</title>
+<script src="/socket.io/socket.io.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
@@ -11,327 +12,162 @@
   :root {
     --background: #121212;
     --surface: #1e1e1e;
-    --surface-card: #282828;
     --primary: #4dd0e1;
     --accent-glow: #ffb74d;
     --text-main: #ffffff;
     --text-muted: #aaaaaa;
     --success: #4caf50;
     --danger: #f44336;
+    --purple-mode: #b388ff;
   }
 
   body {
     background-color: var(--background);
     color: var(--text-main);
     font-family: 'Roboto', Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    overflow-x: hidden;
-    /* ป้องกันการเผลอกดค้างแล้วขึ้นไฮไลต์ข้อความตอนพรีเซนต์บนมือถือ */
-    user-select: none;
-    -webkit-user-select: none;
+    margin: 0; padding: 0;
+    display: flex; flex-direction: column; align-items: center;
+    user-select: none; -webkit-user-select: none;
   }
 
-  /* กล่องครอบขนาดแอปมือถือ */
   .phone-wrapper {
-    width: 100%;
-    max-width: 480px;
-    min-height: 100vh;
-    background-color: var(--background);
-    display: flex;
-    flex-direction: column;
-    box-sizing: border-box;
-    padding-bottom: 80px; /* เว้นที่ให้ปุ่ม Simulator ด้านล่าง */
+    width: 100%; max-width: 480px; min-height: 100vh;
+    display: flex; flex-direction: column;
+    padding-bottom: 120px; /* เว้นพื้นที่ด้านล่างให้ Drawer ที่หนาขึ้น */
   }
 
-  /* Header สไตล์แอปพลิเคชันมือถือ */
   .app-header {
     background-color: var(--surface);
     padding: 18px 20px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    position: sticky;
-    top: 0;
-    z-index: 10;
+    display: flex; align-items: center; gap: 12px;
+    position: sticky; top: 0; z-index: 10;
   }
 
-  .app-header h2 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 500;
-    color: var(--primary);
-    letter-spacing: 0.5px;
-  }
+  .app-header h2 { margin: 0; font-size: 18px; color: var(--primary); }
 
-  /* ส่วนเนื้อหาหลัก */
-  .main-content {
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
+  .main-content { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
 
   .card {
     background-color: var(--surface);
-    border-radius: 16px;
-    padding: 18px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    border-radius: 16px; padding: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.04);
   }
 
   .card h3 {
-    margin-top: 0;
-    margin-bottom: 16px;
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    margin: 0 0 12px 0; font-size: 12px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 1px;
+    display: flex; align-items: center; gap: 6px;
   }
 
   /* ==================================================
-     ELEVATOR DISPLAY & DOOR GRAPHIC (Optimized for Mobile)
+     ELEVATOR MONITOR & MULTI-STATUS ICONS
      ================================================== */
-  .elevator-visual-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
+  .monitor-layout {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; gap: 8px;
   }
 
-  .floor-display-panel {
-    background-color: #000000;
-    border: 2px solid #2a2a2a;
-    border-radius: 8px;
-    padding: 4px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 60px;
-    box-shadow: 0 0 10px rgba(255, 183, 77, 0.1);
+  /* คอลัมน์จัดวางกล่องสถานะ ซ้าย-ขวา */
+  .status-column {
+    display: flex; flex-direction: column; gap: 8px; flex: 1;
   }
 
-  .floor-number {
-    font-size: 34px;
-    font-weight: 700;
-    color: var(--accent-glow);
-    text-shadow: 0 0 10px var(--accent-glow);
-    font-family: 'Courier New', Courier, monospace;
-    line-height: 1;
+  .status-box {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 8px 4px; border-radius: 10px; background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05); text-align: center;
+    transition: all 0.3s ease;
+  }
+  .status-box .material-icons { font-size: 24px; }
+  .status-box span { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; }
+  
+  /* สีสเตตัสต่างๆ */
+  .status-box.online { color: var(--success); border-color: rgba(76, 175, 80, 0.2); background: rgba(76, 175, 80, 0.02); }
+  .status-box.closed { color: var(--danger); border-color: rgba(244, 67, 54, 0.2); background: rgba(244, 67, 54, 0.02); }
+  .status-box.mode-auto { color: var(--primary); border-color: rgba(77, 208, 225, 0.2); background: rgba(77, 208, 225, 0.02); }
+  .status-box.mode-remote { color: var(--purple-mode); border-color: rgba(179, 136, 255, 0.2); background: rgba(179, 136, 255, 0.02); }
+
+  .elevator-visual { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 110px; }
+
+  .floor-display {
+    background: #000; border: 2px solid #333; border-radius: 6px;
+    padding: 2px 16px; color: var(--accent-glow);
+    font-family: 'Courier New', monospace; font-size: 28px; font-weight: bold;
+    text-shadow: 0 0 8px var(--accent-glow); line-height: 1.2;
   }
 
   .elevator-shaft {
-    width: 110px;
-    height: 140px;
-    background-color: #151515;
-    border: 4px solid #333333;
-    border-radius: 8px;
-    position: relative;
-    overflow: hidden;
-    transition: border-color 0.4s ease;
+    width: 90px; height: 120px; background: #151515;
+    border: 3px solid #333; border-radius: 6px;
+    position: relative; overflow: hidden; transition: 0.4s;
   }
-
-  .elevator-shaft.online { border-color: var(--success); box-shadow: 0 0 12px rgba(76, 172, 80, 0.2); }
-  .elevator-shaft.closed { border-color: var(--danger); box-shadow: 0 0 12px rgba(244, 67, 54, 0.2); }
-
-  .elevator-interior {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(circle, #2c2c2c 0%, #111111 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .elevator-interior .material-icons {
-    font-size: 36px;
-    color: rgba(255, 255, 255, 0.15);
-  }
+  .elevator-shaft.online { border-color: var(--success); }
+  .elevator-shaft.closed { border-color: var(--danger); }
 
   .door {
-    position: absolute;
-    top: 0;
-    width: 50%;
-    height: 100%;
-    background: linear-gradient(90deg, #444444 0%, #333333 50%, #222222 100%);
-    border: 1px solid #111;
-    box-sizing: border-box;
-    transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+    position: absolute; top: 0; width: 50%; height: 100%;
+    background: linear-gradient(90deg, #444, #222);
+    border: 1px solid #111; transition: 0.6s cubic-bezier(0.25, 1, 0.5, 1);
     z-index: 2;
   }
+  .door-left { left: 0; } .door-right { right: 0; }
   
-  .door-left { left: 0; border-right: 1.5px solid #555; }
-  .door-right { right: 0; border-left: 1.5px solid #555; }
-
   .elevator-shaft.online .door-left { transform: translateX(-90%); }
   .elevator-shaft.online .door-right { transform: translateX(90%); }
-  .elevator-shaft.closed .door-left { transform: translateX(0); }
-  .elevator-shaft.closed .door-right { transform: translateX(0); }
-
-  .status-display-text {
-    font-size: 12px;
-    font-weight: 700;
-    padding: 4px 12px;
-    border-radius: 4px;
-    background-color: rgba(255, 255, 255, 0.04);
-  }
-  .status-display-text.online { color: var(--success); }
-  .status-display-text.closed { color: var(--danger); }
 
   /* ==================================================
-     CONTROLS & LISTS (Mobile Friendly)
+     15-FLOOR BUTTON GRID
      ================================================== */
-  .control-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
+  .button-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 10px; padding: 4px;
   }
 
-  .led-display {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background-color: #262626;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s ease;
-    box-shadow: inset 0 3px 6px rgba(0,0,0,0.4);
+  .lift-btn {
+    background: #2a2a2a; border: 1px solid #444; border-radius: 12px;
+    padding: 14px 4px; color: #fff; font-weight: bold;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    transition: all 0.2s;
+  }
+  .lift-btn .material-icons { font-size: 16px; color: var(--primary); }
+  .lift-btn span { font-size: 13px; }
+
+  .lift-btn.active {
+    background: rgba(255, 183, 77, 0.15); border-color: var(--accent-glow);
+    box-shadow: 0 0 12px rgba(255, 183, 77, 0.2);
+  }
+  .lift-btn.active span, .lift-btn.active .material-icons {
+    color: var(--accent-glow); text-shadow: 0 0 5px var(--accent-glow);
   }
 
-  .led-display.active {
-    background-color: var(--primary);
-    box-shadow: 0 0 16px rgba(77, 208, 225, 0.4), inset 0 2px 3px rgba(255,255,255,0.4);
+  /* LED Control */
+  .control-row { display: flex; align-items: center; justify-content: space-between; }
+  .led-indicator {
+    width: 42px; height: 42px; border-radius: 50%; background: #222;
+    display: flex; align-items: center; justify-content: center; transition: 0.3s;
   }
-
-  .led-display .material-icons { font-size: 28px; color: var(--text-muted); }
-  .led-display.active .material-icons { color: #121212; }
-
-  .btn-group { display: flex; gap: 8px; flex: 1; }
-
-  button {
-    flex: 1;
-    font-family: 'Roboto', sans-serif;
-    font-size: 13px;
-    font-weight: 500;
-    background-color: #262626;
-    color: var(--text-main);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 8px;
-    padding: 12px 8px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    /* เอฟเฟกต์ยุบตัวเล็กน้อยตอนเอานิ้วกดบนมือถือ */
-    transition: transform 0.1s ease, background-color 0.2s ease;
-  }
-  button:active { transform: scale(0.95); }
-
-  button.btn-on:active { background-color: var(--primary); color: #121212; }
-  button.btn-off:active { background-color: #e57373; color: #121212; }
-  
-  .status-list { display: flex; flex-direction: column; gap: 8px; }
-  .status-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background-color: rgba(255, 255, 255, 0.02);
-    padding: 10px 14px;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.02);
-    transition: all 0.3s ease;
-  }
-
-  .status-item.active { background-color: rgba(255, 183, 77, 0.06); border-color: rgba(255, 183, 77, 0.2); }
-  .status-details { display: flex; align-items: center; gap: 12px; }
-
-  .floor-num {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background-color: rgba(255, 255, 255, 0.05);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    color: var(--primary);
-    font-size: 13px;
-  }
-
-  .status-item.active .floor-num { background-color: var(--accent-glow); color: #121212; }
-  .status-text { font-weight: 500; font-size: 13.5px; }
-
-  .badge {
-    font-size: 11px;
-    font-weight: 700;
-    background-color: rgba(255, 255, 255, 0.06);
-    padding: 4px 10px;
-    border-radius: 12px;
-    color: var(--text-muted);
-  }
-
-  .status-item.active .badge { background-color: var(--accent-glow); color: #121212; }
+  .led-indicator.active { background: var(--primary); box-shadow: 0 0 15px var(--primary); color: #000; }
+  .simple-btn-group { display: flex; gap: 8px; flex: 1; margin-left: 16px; }
+  .simple-btn { flex: 1; padding: 12px; border-radius: 8px; background: #333; border: 1px solid #444; color: #fff; font-size: 12px; font-weight: bold; }
 
   /* ==================================================
-     PRESENTER SIMULATOR DRAWER (เครื่องมือลับคนพรีเซนต์)
+     ADVANCED SIMULATOR DRAWER (เครื่องมือโกงแบบละเอียด)
      ================================================== */
-  .simulator-drawer {
-    position: fixed;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100%;
-    max-width: 480px;
-    background-color: #171717;
-    border-top: 1px dashed rgba(255,255,255,0.2);
-    z-index: 100;
-    box-sizing: border-box;
-    transition: max-height 0.3s ease-out;
-    max-height: 45px; /* ปิดอยู่จะเห็นแค่หัวข้อให้กดเปิด */
-    overflow: hidden;
+  .sim-drawer {
+    position: fixed; bottom: 0; left: 0; width: 100%;
+    background: #161616; border-top: 2px dashed rgba(255,255,255,0.15);
+    z-index: 100; transition: 0.3s ease-in-out; max-height: 42px; overflow: hidden;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.6);
   }
-
-  .simulator-drawer.expanded {
-    max-height: 260px; /* ยืดออกเมื่อต้องการกดทดสอบ */
-  }
-
-  .drawer-toggle {
-    background-color: #222222;
-    padding: 12px;
-    text-align: center;
-    font-size: 12px;
-    font-weight: bold;
-    color: var(--accent-glow);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-  }
-
-  .drawer-content {
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
+  .sim-drawer.open { max-height: 480px; overflow-y: auto; }
+  .sim-header { padding: 13px; text-align: center; font-size: 11px; font-weight: bold; color: var(--accent-glow); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; background: #1f1f1f; }
   
-  .sim-btn { font-size: 11px; padding: 10px 4px; border-color: #444; }
-  .btn-sim-open { color: var(--success); }
-  .btn-sim-close { color: var(--danger); }
+  .sim-section-title { font-size: 10px; color: #888; font-weight: bold; margin: 8px 0 4px 0; text-transform: uppercase; }
+  .sim-grid-15 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 10px; }
+  .sim-mini-btn { background: #222; border: 1px solid #444; color: #ccc; padding: 6px 2px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+  .sim-mini-btn:active { background: var(--accent-glow); color: #000; }
 </style>
 </head>
 
@@ -340,98 +176,83 @@
 <div class="phone-wrapper">
   
   <div class="app-header">
-    <span class="material-icons" style="color: var(--primary)">domain</span>
-    <h2>Pico Lift Prototype</h2>
+    <span class="material-icons">elevator</span>
+    <h2>Lift Control System</h2>
   </div>
 
   <div class="main-content">
     
     <div class="card">
-      <h3><span class="material-icons">door_sliding</span> Monitor Screen</h3>
-      <div class="elevator-visual-container">
-        <div class="floor-display-panel">
-          <div class="floor-number" id="mainFloorDisplay">1</div>
-        </div>
-        <div id="elevatorShaft" class="elevator-shaft closed">
-          <div class="elevator-interior">
-            <span class="material-icons">person</span>
+      <h3><span class="material-icons">visibility</span> Real-time Status Monitor</h3>
+      <div class="monitor-layout">
+        
+        <div class="status-column">
+          <div id="statusBox" class="status-box closed">
+            <span class="material-icons" id="statusIcon">block</span>
+            <span id="statusText">CLOSED</span>
           </div>
-          <div class="door door-left"></div>
-          <div class="door door-right"></div>
+          <div id="modeBox" class="status-box mode-auto">
+            <span class="material-icons" id="modeIcon">smart_toy</span>
+            <span id="modeText">AUTO MODE</span>
+          </div>
         </div>
-        <div id="elevatorStatusText" class="status-display-text closed">CLOSED</div>
+
+        <div class="elevator-visual">
+          <div class="floor-display" id="floorNum">01</div>
+          <div id="shaft" class="elevator-shaft closed">
+            <div class="door door-left"></div>
+            <div class="door door-right"></div>
+          </div>
+        </div>
+
+        <div class="status-column">
+          <div id="doorBox" class="status-box closed">
+            <span class="material-icons" id="doorIcon">door_front</span>
+            <span id="doorText">DOOR CLOSE</span>
+          </div>
+        </div>
+
       </div>
     </div>
     
     <div class="card">
-      <h3><span class="material-icons">radio_button_checked</span> Physical Buttons</h3>
-      <div class="status-list">
-        <div class="status-item" id="row-b1">
-          <div class="status-details">
-            <div class="floor-num">1</div>
-            <div class="status-text">Button 1 (Fl.1)</div>
-          </div>
-          <div class="badge" id="b1">-</div>
-        </div>
-        <div class="status-item" id="row-b2">
-          <div class="status-details">
-            <div class="floor-num">2</div>
-            <div class="status-text">Button 2 (Fl.2)</div>
-          </div>
-          <div class="badge" id="b2">-</div>
-        </div>
-        <div class="status-item" id="row-b3">
-          <div class="status-details">
-            <div class="floor-num">3</div>
-            <div class="status-text">Button 3 (Fl.3)</div>
-          </div>
-          <div class="badge" id="b3">-</div>
-        </div>
-      </div>
+      <h3><span class="material-icons">apps</span> Floor Selection</h3>
+      <div class="button-grid" id="btnGrid"></div>
     </div>
 
     <div class="card">
-      <h3><span class="material-icons">tune</span> Hardware Control</h3>
+      <h3><span class="material-icons">settings_remote</span> Hardware</h3>
       <div class="control-row">
-        <div class="led-display" id="ledIndicator">
-          <span class="material-icons">lightbulb</span>
-        </div>
-        <div class="btn-group">
-          <button class="btn-on" onclick="led('ON')">
-            <span class="material-icons">power</span> ON
-          </button>
-          <button class="btn-off" onclick="led('OFF')">
-            <span class="material-icons">power_off</span> OFF
-          </button>
+        <div id="ledInd" class="led-indicator"><span class="material-icons">lightbulb</span></div>
+        <div class="simple-btn-group">
+          <button class="simple-btn" onclick="led('ON')">LED ON</button>
+          <button class="simple-btn" onclick="led('OFF')">LED OFF</button>
         </div>
       </div>
     </div>
 
   </div>
 
-  <div class="simulator-drawer" id="testDrawer">
-    <div class="drawer-toggle" onclick="toggleDrawer()">
-      <span class="material-icons" id="drawerIcon">expand_less</span> 
-      PRESENTER SIMULATOR PANEL (CLICK TO TEST UI)
+  <div class="sim-drawer" id="simDrawer">
+    <div class="sim-header" onclick="document.getElementById('simDrawer').classList.toggle('open')">
+       <span class="material-icons">bug_report</span> PRESENTER ADVANCED TEST TOOLS (CLICK)
     </div>
-    <div class="drawer-content">
-      
-      <div>
-        <div style="font-size: 11px; margin-bottom: 6px; color: var(--text-muted);">SIMULATE DOOR STATUS</div>
-        <div class="btn-group">
-          <button class="sim-btn btn-sim-open" onclick="updateElevatorDoor('Online')">Open (Online)</button>
-          <button class="sim-btn btn-sim-close" onclick="updateElevatorDoor('Closed')">Close (Closed)</button>
-        </div>
-      </div>
+    <div style="padding: 12px; display: flex; flex-direction: column; gap: 4px;">
+       
+       <div class="sim-section-title">1. System & Door Simulator</div>
+       <div style="display: flex; gap: 6px; margin-bottom: 4px;">
+         <button class="simple-btn" style="color: var(--success); padding:8px;" onclick="setLiftStatus('Online')">Online (Open Door)</button>
+         <button class="simple-btn" style="color: var(--danger); padding:8px;" onclick="setLiftStatus('Closed')">Closed (Close Door)</button>
+       </div>
 
-      <div style="margin-top: 6px;">
-        <div style="font-size: 11px; margin-bottom: 6px; color: var(--text-muted);">SIMULATE PHYSICAL BUTTONS CLICK</div>
-        <div class="btn-group">
-          <button class="sim-btn" onclick="handleButtonUpdate('b1', document.getElementById('b1').innerText === 'PRESSED' ? 'RELEASED' : 'PRESSED')">Fl.1</button>
-          <button class="sim-btn" onclick="handleButtonUpdate('b2', document.getElementById('b2').innerText === 'PRESSED' ? 'RELEASED' : 'PRESSED')">Fl.2</button>
-          <button class="sim-btn" onclick="handleButtonUpdate('b3', document.getElementById('b3').innerText === 'PRESSED' ? 'RELEASED' : 'PRESSED')">Fl.3</button>
-        </div>
-      </div>
+       <div class="sim-section-title">2. Operation Mode Simulator</div>
+       <div style="display: flex; gap: 6px; margin-bottom: 4px;">
+         <button class="simple-btn" style="color: var(--primary); padding:8px;" onclick="setOperationMode('AUTO')">Switch to AUTO</button>
+         <button class="simple-btn" style="color: var(--purple-mode); padding:8px;" onclick="setOperationMode('REMOTE')">Switch to REMOTE</button>
+       </div>
+
+       <div class="sim-section-title">3. Click to Trigger Any Floor Button (Auto-Release)</div>
+       <div class="sim-grid-15" id="simBtnGrid"></div>
 
     </div>
   </div>
@@ -439,77 +260,122 @@
 </div>
 
 <script>
+const socket = io();
 
-// ฟังก์ชันเปิด/ปิดลิ้นชักทดสอบ
-function toggleDrawer() {
-  const drawer = document.getElementById("testDrawer");
-  const icon = document.getElementById("drawerIcon");
-  drawer.classList.toggle("expanded");
-  if(drawer.classList.contains("expanded")) {
-    icon.innerText = "expand_more";
-  } else {
-    icon.innerText = "expand_less";
-  }
+// 1. สร้างปุ่มหน้าจอหลัก (15 ชั้น)
+const btnGrid = document.getElementById('btnGrid');
+for (let i = 15; i >= 1; i--) {
+  const floorName = i < 10 ? '0' + i : i;
+  const btn = document.createElement('div');
+  btn.className = 'lift-btn';
+  btn.id = 'floor-btn-' + i;
+  btn.innerHTML = `<span class="material-icons">radio_button_unchecked</span><span>${floorName}</span>`;
+  btn.onclick = () => pressFloor(i);
+  btnGrid.appendChild(btn);
 }
 
-// ควบคุม LED 
-function led(state){
-  socket.emit("led", state);
-  const indicator = document.getElementById("ledIndicator");
-  if(state === 'ON') {
-    indicator.classList.add('active');
-  } else {
-    indicator.classList.remove('active');
-  }
+// 2. สร้างปุ่มใน Test Tool Drawer (15 ชั้น) -> เพื่อตอบโจทย์ผู้ใช้
+const simBtnGrid = document.getElementById('simBtnGrid');
+for (let i = 1; i <= 15; i++) {
+  const miniBtn = document.createElement('button');
+  miniBtn.className = 'sim-mini-btn';
+  miniBtn.innerText = 'F' + i;
+  miniBtn.onclick = () => pressFloor(i); // ทำงานเหมือนกดจากหน้าจอหลักเป๊ะๆ
+  simBtnGrid.appendChild(miniBtn);
 }
 
-// อัปเดตการเปิด-ปิดประตูลิฟต์
-function updateElevatorDoor(status) {
-  const shaft = document.getElementById("elevatorShaft");
-  const textLabel = document.getElementById("elevatorStatusText");
+// 3. ฟังก์ชันเมื่อมีการกดปุ่มชั้น (ทั้งจากหน้าจอหลัก และจากในเครื่องมือ Test Tool)
+function pressFloor(floor) {
+  socket.emit("mqtt", { topic: "home/button" + floor, message: "PRESSED" });
+  updateButtonUI(floor, "PRESSED");
+}
+
+// 4. ฟังก์ชันอัปเดตสถานะปุ่ม + ระบบ Auto-release คืนค่าใน 3 วินาที
+function updateButtonUI(floor, status) {
+  const btn = document.getElementById('floor-btn-' + floor);
+  const display = document.getElementById('floorNum');
   
+  if (status === "PRESSED" && btn) {
+    btn.classList.add('active');
+    btn.querySelector('.material-icons').innerText = 'radio_button_checked';
+    display.innerText = floor < 10 ? '0' + floor : floor;
+
+    // ระบบหน่วงเวลาคืนสถานะกลับเป็น Released อัตโนมัติหลังผ่านไป 3 วินาที
+    setTimeout(() => {
+      btn.classList.remove('active');
+      btn.querySelector('.material-icons').innerText = 'radio_button_unchecked';
+    }, 3000); 
+  }
+}
+
+// 5. ฟังก์ชันควบคุมระบบ และ สถานะประตูลิฟต์ (Online/Closed และ Open/Close)
+function setLiftStatus(status) {
+  const shaft = document.getElementById('shaft');
+  const sysBox = document.getElementById('statusBox');
+  const sysIcon = document.getElementById('statusIcon');
+  const sysTxt = document.getElementById('statusText');
+  
+  const doorBox = document.getElementById('doorBox');
+  const doorIcon = document.getElementById('doorIcon');
+  const doorTxt = document.getElementById('doorText');
+
   if (status === "Online" || status === "OPEN") {
-    shaft.classList.remove("closed");
-    shaft.classList.add("online");
-    textLabel.innerText = "ONLINE / OPENED";
-    textLabel.className = "status-display-text online";
-  } else if (status === "Closed" || status === "CLOSE") {
-    shaft.classList.remove("online");
-    shaft.classList.add("closed");
-    textLabel.innerText = "CLOSED";
-    textLabel.className = "status-display-text closed";
-  }
-}
-
-// อัปเดตสถานะปุ่มและตัวเลขหน้าปัดลิฟต์
-function handleButtonUpdate(elementId, message) {
-  const badge = document.getElementById(elementId);
-  const row = document.getElementById("row-" + elementId);
-  const floorDisplay = document.getElementById("mainFloorDisplay");
-  
-  if(badge && row) {
-    badge.innerText = message;
-    const status = message.trim().toUpperCase();
+    // อัปเดตฝั่งระบบ
+    shaft.className = "elevator-shaft online";
+    sysBox.className = "status-box online";
+    sysIcon.innerText = "check_circle";
+    sysTxt.innerText = "ONLINE";
     
-    if(status === 'ON' || status === '1' || status === 'TRUE' || status === 'PRESSED') {
-      row.classList.add('active');
-      if(elementId === 'b1') floorDisplay.innerText = "1";
-      if(elementId === 'b2') floorDisplay.innerText = "2";
-      if(elementId === 'b3') floorDisplay.innerText = "3";
-    } else {
-      row.classList.remove('active');
-    }
+    // อัปเดตฝั่งกล่องสถานะประตู
+    doorBox.className = "status-box online";
+    doorIcon.innerText = "door_open";
+    doorTxt.innerText = "DOOR OPEN";
+  } else {
+    // อัปเดตฝั่งระบบ
+    shaft.className = "elevator-shaft closed";
+    sysBox.className = "status-box closed";
+    sysIcon.innerText = "block";
+    sysTxt.innerText = "CLOSED";
+    
+    // อัปเดตฝั่งกล่องสถานะประตู
+    doorBox.className = "status-box closed";
+    doorIcon.innerText = "door_front";
+    doorTxt.innerText = "DOOR CLOSE";
   }
 }
 
-// ดักฟังเหตุการณ์จริงจาก MQTT
-socket.on("mqtt", data => {
-  if(data.topic == "home/elevator" || data.topic == "home/status") {
-    updateElevatorDoor(data.message);
+// 6. ฟังก์ชันควบคุมโหมดการทำงาน (AUTO / REMOTE)
+function setOperationMode(mode) {
+  const modeBox = document.getElementById('modeBox');
+  const modeIcon = document.getElementById('modeIcon');
+  const modeText = document.getElementById('modeText');
+
+  if (mode === "AUTO") {
+    modeBox.className = "status-box mode-auto";
+    modeIcon.innerText = "smart_toy";
+    modeText.innerText = "AUTO MODE";
+  } else if (mode === "REMOTE") {
+    modeBox.className = "status-box mode-remote";
+    modeIcon.innerText = "settings_remote";
+    modeText.innerText = "REMOTE MODE";
   }
-  if(data.topic == "home/button1") handleButtonUpdate("b1", data.message);
-  if(data.topic == "home/button2") handleButtonUpdate("b2", data.message);
-  if(data.topic == "home/button3") handleButtonUpdate("b3", data.message);
+}
+
+// 7. LED Control
+function led(state) {
+  socket.emit("led", state);
+  document.getElementById('ledInd').className = state === 'ON' ? 'led-indicator active' : 'led-indicator';
+}
+
+// 8. ดักฟังเหตุการณ์จริงจาก MQTT ของบอร์ด Pico
+socket.on("mqtt", data => {
+  if(data.topic === "home/status") setLiftStatus(data.message);
+  if(data.topic === "home/mode") setOperationMode(data.message); // รองรับ topic สำหรับโหมด
+  
+  if(data.topic.startsWith("home/button")) {
+    const floor = data.topic.replace("home/button", "");
+    if(data.message === "PRESSED") updateButtonUI(parseInt(floor), "PRESSED");
+  }
 });
 </script>
 
