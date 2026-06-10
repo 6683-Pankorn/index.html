@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Elevator Advanced State Machine Prototype</title>
+<title>Elevator Group Control Dashboard - SCAN Algorithm</title>
 <script src="/socket.io/socket.io.js" onerror="console.warn('Socket.io server not found. Running in standalone mode.')"></script>
-<link href="https://fonts.googleapis.com/css2=family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
 <style>
@@ -39,7 +39,6 @@
   }
   .app-header h2 { margin: 0; font-size: 18px; color: var(--primary); }
 
-  /* Responsive Grid System */
   .main-grid { padding: 16px; display: grid; grid-template-columns: 1fr; gap: 16px; }
 
   @media (min-width: 768px) {
@@ -57,6 +56,39 @@
     margin: 0 0 16px 0; font-size: 13px; color: var(--text-muted);
     text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 6px;
   }
+
+  /* MULTI-LIFT OVERVIEW MENU GRID */
+  .group-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px; margin-bottom: 4px;
+  }
+  
+  .lift-menu-card {
+    background: #252525; border: 2px solid #333; border-radius: 12px;
+    padding: 12px; cursor: pointer; transition: all 0.2s ease;
+    display: flex; flex-direction: column; gap: 8px; position: relative;
+  }
+  
+  .lift-menu-card:hover { border-color: var(--primary); background: #2a2a2a; }
+  .lift-menu-card.active-menu {
+    border-color: var(--primary);
+    background: rgba(77, 208, 225, 0.08);
+    box-shadow: 0 0 12px rgba(77, 208, 225, 0.2);
+  }
+  
+  .lift-menu-header { display: flex; justify-content: space-between; align-items: center; }
+  .lift-menu-title { font-weight: bold; font-size: 14px; color: var(--text-main); }
+  
+  .lift-menu-body { display: flex; align-items: center; justify-content: space-between; padding-top: 4px; }
+  .lift-menu-floor { font-family: 'Courier New', monospace; font-size: 26px; font-weight: bold; color: var(--accent-glow); }
+  
+  .mini-badge { font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: bold; text-transform: uppercase; }
+  .badge-online { background: rgba(76, 175, 80, 0.15); color: var(--success); }
+  .badge-closed { background: rgba(244, 67, 54, 0.15); color: var(--danger); }
+  
+  .mini-icon-row { display: flex; gap: 6px; color: var(--text-muted); }
+  .mini-icon-row .material-icons { font-size: 18px; }
 
   /* MONITOR LAYOUT */
   .monitor-layout { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; gap: 8px; }
@@ -77,67 +109,40 @@
 
   .elevator-visual { display: flex; flex-direction: column; align-items: center; gap: 0px; width: 110px; }
   
-  /* [เพิ่มใหม่] โซนไฟลูกศรบอกทิศทาง */
-  .direction-indicator-box {
-    height: 32px; /* เว้นพื้นที่ด้านบนเลขชั้น */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    visibility: hidden; /* ซ่อนไว้เมื่อ IDLE */
-  }
-  
-  .direction-indicator-box .material-icons {
-    font-size: 32px;
-    font-weight: bold;
-    transition: all 0.2s;
-  }
+  .direction-indicator-box { height: 32px; display: flex; align-items: center; justify-content: center; visibility: hidden; }
+  .direction-indicator-box .material-icons { font-size: 32px; font-weight: bold; transition: all 0.2s; }
 
-  /* อนิเมชั่น bounce ขยับเบาๆ เมื่อกำลังเคลื่อนที่ */
-  @keyframes dir-bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
-  }
-
-  /* สีและสถานะลูกศร */
+  @keyframes dir-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
   .direction-indicator-box.moving-up { visibility: visible; color: var(--success); text-shadow: 0 0 8px var(--success); }
   .direction-indicator-box.moving-up .material-icons { animation: dir-bounce 0.8s infinite; }
-
   .direction-indicator-box.moving-down { visibility: visible; color: var(--accent-glow); text-shadow: 0 0 8px var(--accent-glow); }
   .direction-indicator-box.moving-down .material-icons { animation: dir-bounce 0.8s infinite; }
 
-
   .floor-display {
-    background: #000; border: 2px solid #333; border-radius: 6px;
-    padding: 4px 18px; color: var(--accent-glow);
-    font-family: 'Courier New', monospace; font-size: 32px; font-weight: bold;
-    text-shadow: 0 0 8px var(--accent-glow); line-height: 1;
-    z-index: 1; /* ให้อยู่เหนือเงาลูกศร */
+    background: #000; border: 2px solid #333; border-radius: 6px; padding: 4px 18px; color: var(--accent-glow);
+    font-family: 'Courier New', monospace; font-size: 32px; font-weight: bold; text-shadow: 0 0 8px var(--accent-glow); line-height: 1; z-index: 1;
   }
 
   .elevator-shaft {
-    width: 95px; height: 125px; background: #151515;
-    border: 3px solid #333; border-radius: 6px; position: relative; overflow: hidden; transition: 0.3s;
-    margin-top: 10px;
+    width: 95px; height: 125px; background: #151515; border: 3px solid #333; border-radius: 6px;
+    position: relative; overflow: hidden; transition: 0.3s; margin-top: 10px;
   }
   .elevator-shaft.online { border-color: var(--success); box-shadow: 0 0 10px rgba(76, 175, 80, 0.1); }
   .elevator-shaft.closed { border-color: var(--danger); box-shadow: 0 0 10px rgba(244, 67, 54, 0.1); }
   
   .door {
-    position: absolute; top: 0; width: 50%; height: 100%;
-    background: linear-gradient(90deg, #444, #222); border: 1px solid #111;
-    transition: 0.6s cubic-bezier(0.25, 1, 0.5, 1); z-index: 2;
+    position: absolute; top: 0; width: 50%; height: 100%; background: linear-gradient(90deg, #444, #222);
+    border: 1px solid #111; transition: 0.6s cubic-bezier(0.25, 1, 0.5, 1); z-index: 2;
   }
   .door-left { left: 0; } .door-right { right: 0; }
-  
   .elevator-shaft.door-open .door-left { transform: translateX(-90%); }
   .elevator-shaft.door-open .door-right { transform: translateX(90%); }
 
   /* BUTTON GRIDS */
   .button-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .lift-btn {
-    background: #2a2a2a; border: 1px solid #444; border-radius: 12px;
-    padding: 15px 4px; color: #fff; font-weight: bold;
-    display: flex; flex-direction: column; align-items: center; gap: 4px; transition: 0.2s; cursor: pointer;
+    background: #2a2a2a; border: 1px solid #444; border-radius: 12px; padding: 15px 4px; color: #fff;
+    font-weight: bold; display: flex; flex-direction: column; align-items: center; gap: 4px; transition: 0.2s; cursor: pointer;
   }
   .lift-btn .material-icons { font-size: 16px; color: var(--primary); }
   .lift-btn.active { background: rgba(255, 183, 77, 0.15); border-color: var(--accent-glow); }
@@ -159,6 +164,8 @@
   .sim-grid-15 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
   .sim-mini-btn { background: #262626; border: 1px solid #555; color: #fff; padding: 12px 2px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; }
   .sim-mini-btn:hover { border-color: var(--accent-glow); }
+  
+  .active-lift-header-title { color: var(--primary) !important; font-weight: bold; font-size: 14px !important; }
 </style>
 </head>
 
@@ -168,13 +175,18 @@
   
   <div class="app-header">
     <span class="material-icons">elevator</span>
-    <h2>Lift Intelligent Control Dashboard</h2>
+    <h2>Group Elevator Control (SCAN Algorithm Interface)</h2>
   </div>
 
-  <div class="main-content main-grid">
+  <div class="main-grid">
     
     <div class="card full-width-pc">
-      <h3><span class="material-icons">visibility</span> Real-time Status Monitor</h3>
+      <h3><span class="material-icons">dashboard</span> Multi-Elevator System Overview Menu (Supports Multi-Floor Queue)</h3>
+      <div class="group-overview-grid" id="overviewGrid"></div>
+    </div>
+    
+    <div class="card full-width-pc">
+      <h3 class="active-lift-header-title" id="activeMonitorTitle"><span class="material-icons">visibility</span> Real-time Status Monitor: LIFT 01</h3>
       <div class="monitor-layout">
         
         <div class="status-column">
@@ -210,7 +222,7 @@
     </div>
     
     <div class="card">
-      <h3><span class="material-icons">apps</span> Floor Selection (Passenger Panel)</h3>
+      <h3 class="active-lift-header-title" id="activePassengerTitle"><span class="material-icons">apps</span> Passenger Panel: LIFT 01</h3>
       <div class="button-grid" id="btnGrid"></div>
     </div>
 
@@ -232,17 +244,17 @@
         
         <div class="sim-section-title">1. System Operational Status</div>
         <div style="display: flex; gap: 8px;">
-          <button class="simple-btn" style="color: var(--success);" onclick="setLiftStatus('Online')">Set Online</button>
-          <button class="simple-btn" style="color: var(--danger);" onclick="setLiftStatus('Closed')">Set Closed</button>
+          <button class="simple-btn" style="color: var(--success);" onclick="triggerTestStatus('Online')">Set Online</button>
+          <button class="simple-btn" style="color: var(--danger);" onclick="triggerTestStatus('Closed')">Set Closed</button>
         </div>
 
         <div class="sim-section-title">2. Operation Mode Control</div>
         <div style="display: flex; gap: 8px;">
-          <button class="simple-btn" style="color: var(--primary);" onclick="setOperationMode('AUTO')">Force AUTO</button>
-          <button class="simple-btn" style="color: var(--purple-mode);" onclick="setOperationMode('REMOTE')">Force REMOTE</button>
+          <button class="simple-btn" style="color: var(--primary);" onclick="triggerTestMode('AUTO')">Force AUTO</button>
+          <button class="simple-btn" style="color: var(--purple-mode);" onclick="triggerTestMode('REMOTE')">Force REMOTE</button>
         </div>
 
-        <div class="sim-section-title">3. Inject Floor Command</div>
+        <div class="sim-section-title">3. Inject Floor Command (Multi-press supported)</div>
         <div class="sim-grid-15">
           <button class="sim-mini-btn" onclick="triggerTestFloor(1)">F1</button>
           <button class="sim-mini-btn" onclick="triggerTestFloor(2)">F2</button>
@@ -268,20 +280,21 @@
 </div>
 
 <script>
-// ตรวจสอบเช็คระบบป้องกันแครชกรณีเว็บเป็นแบบ Static บน GitHub Pages
 let socket = null;
 if (typeof io !== 'undefined') { socket = io(); }
 
-// ตัวแปรเก็บสถานะระดับ Global ของลิฟต์ (State Machine)
-let currentFloor = 1;
-let targetFloor = 1;
-let isMoving = false;
-let systemState = "Closed"; // โหมดตั้งต้นปิดทำการอยู่
-let doorState = "CLOSED";   // โหมดตั้งต้นประตูปิดอยู่
-let movementDirection = null; // [เพิ่มใหม่] UP, DOWN, or null
-let movementTimer = null;
+// ================= ฐานข้อมูลเก็บอาร์เรย์คิวชั้น (targets) แยกอิสระ 5 ตัว =================
+let lifts = {
+  1: { currentFloor: 1,  targets: [], isMoving: false, systemState: "Online", doorState: "CLOSED", movementDirection: null, movementTimer: null, ledState: "OFF", modeState: "AUTO" },
+  2: { currentFloor: 3,  targets: [], isMoving: false, systemState: "Online", doorState: "CLOSED", movementDirection: null, movementTimer: null, ledState: "OFF", modeState: "AUTO" },
+  3: { currentFloor: 7,  targets: [], isMoving: false, systemState: "Closed", doorState: "CLOSED", movementDirection: null, movementTimer: null, ledState: "OFF", modeState: "AUTO" },
+  4: { currentFloor: 11, targets: [], isMoving: false, systemState: "Online", doorState: "CLOSED", movementDirection: null, movementTimer: null, ledState: "OFF", modeState: "AUTO" },
+  5: { currentFloor: 15, targets: [], isMoving: false, systemState: "Online", doorState: "CLOSED", movementDirection: null, movementTimer: null, ledState: "OFF", modeState: "AUTO" }
+};
 
-// 1. สร้างแผงกดปุ่มลิฟต์ 15 ชั้น
+let activeLiftId = 1;
+
+// 1. สร้างปุ่มกดชั้นผู้โดยสาร 15 ชั้น
 const btnGrid = document.getElementById('btnGrid');
 for (let i = 15; i >= 1; i--) {
   const floorName = i < 10 ? '0' + i : i;
@@ -293,143 +306,297 @@ for (let i = 15; i >= 1; i--) {
   btnGrid.appendChild(btn);
 }
 
-// 2. ฟังก์ชันเมื่อ "ผู้โดยสาร" กดลิฟต์จากหน้าแผงหลัก
-function passengerPressFloor(floor) {
-  if (systemState !== "Online") {
-    alert("ลิฟต์ไม่ได้เปิดให้บริการอยู่ในขณะนี้");
-    return;
-  }
-  if (isMoving) return;
+// 2. สร้างเมนูด้านบน
+const overviewGrid = document.getElementById('overviewGrid');
+for (let id = 1; id <= 5; id++) {
+  const card = document.createElement('div');
+  card.className = `lift-menu-card ${id === activeLiftId ? 'active-menu' : ''}`;
+  card.id = `lift-menu-${id}`;
+  card.onclick = () => switchActiveLift(id);
+  overviewGrid.appendChild(card);
+  updateOverviewCardUI(id);
+}
+
+syncDetailedPanelUI();
+
+// 3. ฟังก์ชันสลับเมนูลิฟต์
+function switchActiveLift(liftId) {
+  document.querySelectorAll('.lift-menu-card').forEach(c => c.classList.remove('active-menu'));
+  document.getElementById(`lift-menu-${liftId}`).classList.add('active-menu');
+  activeLiftId = liftId;
   
-  if(socket) socket.emit("mqtt", { topic: "home/button" + floor, message: "PRESSED" });
-  executeElevatorLogic(floor);
+  document.getElementById('activeMonitorTitle').innerHTML = `<span class="material-icons">visibility</span> Real-time Status Monitor: LIFT 0${liftId}`;
+  document.getElementById('activePassengerTitle').innerHTML = `<span class="material-icons">apps</span> Passenger Panel: LIFT 0${liftId}`;
+  
+  syncDetailedPanelUI();
 }
 
-// 3. ฟังก์ชันแกนหลักของแผงผู้บรรยาย (Test Tool)
-function triggerTestFloor(floor) {
-  setOperationMode('REMOTE');
-  setLiftStatus('Online');
-  if(socket) {
-    socket.emit("mqtt", { topic: "home/mode", message: "REMOTE" });
-    socket.emit("mqtt", { topic: "home/button" + floor, message: "PRESSED" });
+// 4. วาดการ์ดภาพรวมเมนู
+function updateOverviewCardUI(id) {
+  const card = document.getElementById(`lift-menu-${id}`);
+  const lift = lifts[id];
+  const floorStr = lift.currentFloor < 10 ? '0' + lift.currentFloor : lift.currentFloor;
+  
+  let statusBadge = lift.systemState === "Online" ? `<span class="mini-badge badge-online">Online</span>` : `<span class="mini-badge badge-closed">Closed</span>`;
+  
+  let dirIcon = "";
+  if (lift.movementDirection === "UP") dirIcon = `<span class="material-icons" style="color:var(--success);">arrow_upward</span>`;
+  else if (lift.movementDirection === "DOWN") dirIcon = `<span class="material-icons" style="color:var(--accent-glow);">arrow_downward</span>`;
+  else dirIcon = `<span class="material-icons" style="color:#555;">horizontal_rule</span>`;
+  
+  let doorIcon = lift.doorState === "OPEN" ? "door_open" : "door_front";
+
+  // เพิ่มการแสดงผลจำนวนคิวชั้นที่ค้างอยู่เบาๆ ข้างไอคอน
+  let queueCount = lift.targets.length > 0 ? `<span style="font-size:10px; color:var(--primary); font-weight:bold;">(${lift.targets.length}Q)</span>` : "";
+
+  card.innerHTML = `
+    <div class="lift-menu-header">
+      <span class="lift-menu-title">LIFT 0${id} ${queueCount}</span>
+      ${statusBadge}
+    </div>
+    <div class="lift-menu-body">
+      <div class="lift-menu-floor">${floorStr}</div>
+      <div class="mini-icon-row">
+        ${dirIcon}
+        <span class="material-icons">${doorIcon}</span>
+      </div>
+    </div>
+  `;
+}
+
+// 5. ซิงค์ค่าแผงคุมด้านล่าง
+function syncDetailedPanelUI() {
+  const lift = lifts[activeLiftId];
+  const display = document.getElementById('floorNum');
+  display.innerText = lift.currentFloor < 10 ? '0' + lift.currentFloor : lift.currentFloor;
+  updateDirectionIndicatorUI(lift.movementDirection);
+  setLiftStatusUI(lift.systemState);
+  setDoorStatusUI(lift.doorState);
+  setOperationModeUI(lift.modeState);
+  
+  // ซิงค์ปุ่มกดทั้งหมดตามคิวที่มีอยู่ในอาเรย์ targets 
+  for (let i = 1; i <= 15; i++) {
+    setButtonLightUI(i, lift.targets.includes(i));
   }
-  executeElevatorLogic(floor);
+  document.getElementById('ledInd').className = lift.ledState === 'ON' ? 'led-indicator active' : 'led-indicator';
 }
 
-// 4. เครื่องจักรกลคำนวณการเลื่อนชั้น (State Machine Logic Update)
-function executeElevatorLogic(floor) {
-  if (isMoving) return;
-  targetFloor = floor;
-  setButtonLight(targetFloor, true);
-
-  if (currentFloor === targetFloor) {
-    movementDirection = null; // จอดสนิท
-    updateDirectionIndicator(null);
-    handleDoorCycle();
+// 6. เมื่อผู้โดยสารกดแผงคุมหลัก
+function passengerPressFloor(floor) {
+  let lift = lifts[activeLiftId];
+  if (lift.systemState !== "Online") {
+    alert(`ลิฟต์ LIFT 0${activeLiftId} ปิดให้บริการอยู่`);
+    return;
+  }
+  
+  // กดชั้นที่อยู่ปัจจุบัน และลิฟต์ไม่ได้วิ่งอยู่ ให้เปิดประตูทันที
+  if (lift.currentFloor === floor && !lift.isMoving) {
+    handleDoorCycle(activeLiftId);
     return;
   }
 
-  isMoving = true;
-  setDoorStatus("CLOSED");
-
-  // [เพิ่มใหม่] กำหนดทิศทางก่อนเริ่มขยับ
-  if (currentFloor < targetFloor) {
-    movementDirection = "UP";
-  } else if (currentFloor > targetFloor) {
-    movementDirection = "DOWN";
+  // เพิ่มเข้าคิวกรณีที่ยังไม่มีในอาร์เรย์คิว
+  if (!lift.targets.includes(floor)) {
+    lift.targets.push(floor);
+    if (activeLiftId === activeLiftId) setButtonLightUI(floor, true);
+    updateOverviewCardUI(activeLiftId);
   }
-  updateDirectionIndicator(movementDirection); // แสดงลูกศรทันที
+  
+  if(socket) socket.emit("mqtt", { topic: `home/lift${activeLiftId}/button`, message: floor.toString() });
+  
+  // เรียกเครื่องยนต์คำนวณสมาร์ทคิว SCAN Algorithm
+  processElevatorQueue(activeLiftId);
+}
 
+// 7. ปุ่มกดแผงทดสอบผู้บรรยาย
+function triggerTestFloor(floor) {
+  let lift = lifts[activeLiftId];
+  lift.modeState = 'REMOTE';
+  lift.systemState = 'Online';
+  setOperationModeUI('REMOTE');
+  setLiftStatusUI('Online');
+  
+  if (lift.currentFloor === floor && !lift.isMoving) {
+    handleDoorCycle(activeLiftId);
+    return;
+  }
+
+  if (!lift.targets.includes(floor)) {
+    lift.targets.push(floor);
+    setButtonLightUI(floor, true);
+  }
+  updateOverviewCardUI(activeLiftId);
+  
+  if(socket) {
+    socket.emit("mqtt", { topic: `home/lift${activeLiftId}/mode`, message: "REMOTE" });
+    socket.emit("mqtt", { topic: `home/lift${activeLiftId}/button`, message: floor.toString() });
+  }
+  processElevatorQueue(activeLiftId);
+}
+
+function triggerTestStatus(status) {
+  lifts[activeLiftId].modeState = 'REMOTE';
+  lifts[activeLiftId].systemState = status;
+  setOperationModeUI('REMOTE');
+  setLiftStatusUI(status);
+  updateOverviewCardUI(activeLiftId);
+  if(socket) socket.emit("mqtt", { topic: `home/lift${activeLiftId}/status`, message: status });
+}
+
+function triggerTestMode(mode) {
+  lifts[activeLiftId].modeState = mode;
+  setOperationModeUI(mode);
+  updateOverviewCardUI(activeLiftId);
+  if(socket) socket.emit("mqtt", { topic: `home/lift${activeLiftId}/mode`, message: mode });
+}
+
+// ================= 8. เครื่องยนต์หลัก SCAN Algorithm (Intelligent Core) =================
+function processElevatorQueue(liftId) {
+  let lift = lifts[liftId];
+  
+  // ไม่มีคิวเหลืออยู่เลย -> จอดสแตนด์บาย
+  if (lift.targets.length === 0) {
+    lift.isMoving = false;
+    lift.movementDirection = null;
+    updateOverviewCardUI(liftId);
+    if (liftId === activeLiftId) updateDirectionIndicatorUI(null);
+    return;
+  }
+
+  // หากลิฟต์กำลังขยับวิ่งสแกนชั้นอยู่แล้ว ปล่อยให้ลูปเดิมทำงานต่อ (ลูปจะเห็นค่าคิวใหม่เองอัตโนมัติ)
+  if (lift.isMoving) return; 
+
+  lift.isMoving = true;
+  setDoorStatusLogic(liftId, "CLOSED"); // สั่งปิดประตูก่อนออกตัว
+
+  // หน่วงเวลาสไลด์ปิดประตู 0.6 วินาที ก่อนเริ่มรันลูปไต่ชั้น
   setTimeout(() => {
-    movementTimer = setInterval(() => {
-      if (currentFloor < targetFloor) {
-        currentFloor++;
-      } else if (currentFloor > targetFloor) {
-        currentFloor--;
+    if (lift.movementTimer) clearInterval(lift.movementTimer);
+
+    lift.movementTimer = setInterval(() => {
+      
+      // คอนเซปต์เด็ด SCAN: ตัดสินใจทิศทาง (เรียงลำดับความสำคัญของชั้น)
+      if (!lift.movementDirection) {
+        // หากจอดนิ่งอยู่แล้วเพิ่งเริ่มขยับ ให้วิ่งไปหาเป้าหมายแรกในคิว
+        lift.movementDirection = lift.targets[0] > lift.currentFloor ? "UP" : "DOWN";
+      } else {
+        // หากกำลังเคลื่อนที่อยู่ ให้เช็คว่าทางข้างหน้ายังมีเป้าหมายหลงเหลืออยู่ไหม
+        let hasTargetsAhead = false;
+        if (lift.movementDirection === "UP") {
+          hasTargetsAhead = lift.targets.some(f => f > lift.currentFloor);
+          // ถ้าทางข้างบนหมดคิวแล้ว แต่มีคิวค้างอยู่ทางด้านล่าง -> ให้ทำการกลับทิศทางรถลิฟต์ลง
+          if (!hasTargetsAhead && lift.targets.some(f => f < lift.currentFloor)) {
+            lift.movementDirection = "DOWN";
+          }
+        } else if (lift.movementDirection === "DOWN") {
+          hasTargetsAhead = lift.targets.some(f => f < lift.currentFloor);
+          // ถ้าทางข้างล่างเคลียร์หมดคิวแล้ว แต่มีคิวค้างอยู่ด้านบน -> กลับทิศทางขึ้นข้างบน
+          if (!hasTargetsAhead && lift.targets.some(f => f > lift.currentFloor)) {
+            lift.movementDirection = "UP";
+          }
+        }
       }
 
-      updateFloorDisplay(currentFloor);
+      // อัปเดต UI ทิศทางลูกศร
+      if (liftId === activeLiftId) updateDirectionIndicatorUI(lift.movementDirection);
+      updateOverviewCardUI(liftId);
 
-      if (currentFloor === targetFloor) {
-        clearInterval(movementTimer);
-        isMoving = false;
+      // เริ่มทำการเขยิบชั้นตามทิศทางสแกนที่คำนวณได้
+      if (lift.movementDirection === "UP") lift.currentFloor++;
+      if (lift.movementDirection === "DOWN") lift.currentFloor--;
+
+      // แสดงผลตัวเลขหน้าปัดตามเวลาจริงขณะเลื่อนผ่านชั้นระหว่างทาง
+      if (liftId === activeLiftId) {
+        document.getElementById('floorNum').innerText = lift.currentFloor < 10 ? '0' + lift.currentFloor : lift.currentFloor;
+      }
+      updateOverviewCardUI(liftId);
+
+      // เช็คว่าชั้นระหว่างทางที่สไลด์มาถึงนี้ ตรงกับชั้นใดๆ ในคิวผู้โดยสารหรือไม่ (Interception check)
+      let targetIndex = lift.targets.indexOf(lift.currentFloor);
+      if (targetIndex !== -1) {
+        // เจอชั้นเป้าหมาย! -> สั่งเบรกจอดทันที
+        clearInterval(lift.movementTimer);
+        lift.movementTimer = null;
         
-        // [เพิ่มใหม่] เลื่อนเสร็จแล้ว ซ่อนลูกศร
-        movementDirection = null;
-        updateDirectionIndicator(null);
-
-        handleDoorCycle();
+        // ลบชั้นนี้ออกจากอาร์เรย์รายการคิว
+        lift.targets.splice(targetIndex, 1);
+        
+        // เข้าสู่วงจรเปิดประตูส่งผู้โดยสาร
+        handleDoorCycle(liftId, () => {
+          // Callback: เมื่อประตูสไลด์ปิดสนิทเรียบร้อยแล้ว ให้สั่งประมวลคิวต่อทันที (Recursive Resume)
+          lift.isMoving = false;
+          processElevatorQueue(liftId);
+        });
       }
-    }, 1000); // 1 วินาทีต่อ 1 ชั้น
+
+    }, 1000); // ความเร็วไต่ระดับทีละ 1 ชั้นต่อวินาที
   }, 600);
 }
 
-// ฟังก์ชันดูแลวงจรเปิด-ปิดประตูเมื่อเดินทางถึงเป้าหมาย
-function handleDoorCycle() {
-  setDoorStatus("OPEN");
-  setButtonLight(currentFloor, false);
+// ฟังก์ชันดูแลวงจรเปิด-ปิดประตูพร้อมรับคำสั่ง Callback เมื่อปิดจบขั้นตอน
+function handleDoorCycle(liftId, onComplete) {
+  setDoorStatusLogic(liftId, "OPEN");
+  if (liftId === activeLiftId) {
+    setButtonLightUI(lifts[liftId].currentFloor, false); // ดับไฟปุ่มกดเฉพาะชั้นที่ถึงแล้ว
+  }
+  
+  // ค้างประตูไว้ 3 วินาทีแล้วสั่งสไลด์ปิดกลับมา
   setTimeout(() => {
-    if (!isMoving) { setDoorStatus("CLOSED"); }
+    setDoorStatusLogic(liftId, "CLOSED");
+    // รอระบบประตูสไลด์ปิดทางกายภาพเสร็จสิ้น (600ms) จากนั้นยิงลูปคำสั่งออกเดินทางต่อไป
+    setTimeout(() => {
+      if (onComplete) onComplete();
+    }, 600);
   }, 3000);
 }
 
-// 5. ตัวจัดการ UI ป้ายไฟดิจิตอลบอกชั้น
-function updateFloorDisplay(floor) {
-  const display = document.getElementById('floorNum');
-  display.innerText = floor < 10 ? '0' + floor : floor;
+function setDoorStatusLogic(liftId, state) {
+  lifts[liftId].doorState = state;
+  updateOverviewCardUI(liftId);
+  if (liftId === activeLiftId) setDoorStatusUI(state);
 }
 
-// [เพิ่มใหม่] 6. ตัวจัดการ UI ไฟลูกศรบอกทิศทาง
-function updateDirectionIndicator(direction) {
+// ================= UI UPDATE HELPER FUNCTIONS =================
+function updateDirectionIndicatorUI(direction) {
   const dirBox = document.getElementById('directionIndicatorBox');
   const dirIcon = document.getElementById('directionIcon');
-
   if (direction === "UP") {
-    dirBox.className = "direction-indicator-box moving-up";
-    dirIcon.innerText = "arrow_upward";
+    dirBox.className = "direction-indicator-box moving-up"; dirIcon.innerText = "arrow_upward";
   } else if (direction === "DOWN") {
-    dirBox.className = "direction-indicator-box moving-down";
-    dirIcon.innerText = "arrow_downward";
+    dirBox.className = "direction-indicator-box moving-down"; dirIcon.innerText = "arrow_downward";
   } else {
-    // จอดสนิท: ลบสี/อนิเมชั่น และซ่อนด้วย CSS
     dirBox.className = "direction-indicator-box";
   }
 }
 
-// 7. ตัวจัดการ UI หลอดไฟสถานะปุ่มกดชั้น
-function setButtonLight(floor, isActive) {
+function setButtonLightUI(floor, isActive) {
   const btn = document.getElementById('floor-btn-' + floor);
   if (btn) {
     if (isActive) {
-      btn.classList.add('active');
-      btn.querySelector('.material-icons').innerText = 'radio_button_checked';
+      btn.classList.add('active'); btn.querySelector('.material-icons').innerText = 'radio_button_checked';
     } else {
-      btn.classList.remove('active');
-      btn.querySelector('.material-icons').innerText = 'radio_button_unchecked';
+      btn.classList.remove('active'); btn.querySelector('.material-icons').innerText = 'radio_button_unchecked';
     }
   }
 }
 
-// 8. [แยกสถานะ] ฟังก์ชันควบคุมระบบ Online / Offline (Closed)
-function setLiftStatus(status) {
-  systemState = status;
+function setLiftStatusUI(status) {
   const shaft = document.getElementById('shaft');
   const sysBox = document.getElementById('statusBox');
   const sysIcon = document.getElementById('statusIcon');
   const sysTxt = document.getElementById('statusText');
+  const isCurrentlyOpen = lifts[activeLiftId].doorState === "OPEN";
 
   if (status === "Online") {
-    shaft.className = doorState === "CLOSED" ? "elevator-shaft online" : "elevator-shaft online door-open";
+    shaft.className = isCurrentlyOpen ? "elevator-shaft online door-open" : "elevator-shaft online";
     sysBox.className = "status-box online"; sysIcon.innerText = "check_circle"; sysTxt.innerText = "ONLINE";
   } else {
-    shaft.className = doorState === "CLOSED" ? "elevator-shaft closed" : "elevator-shaft closed door-open";
+    shaft.className = isCurrentlyOpen ? "elevator-shaft closed door-open" : "elevator-shaft closed";
     sysBox.className = "status-box closed"; sysIcon.innerText = "block"; sysTxt.innerText = "CLOSED";
   }
 }
 
-// 9. [แยกสถานะ] ฟังก์ชันควบคุมบานประตูลิฟต์
-function setDoorStatus(state) {
-  doorState = state;
+function setDoorStatusUI(state) {
   const shaft = document.getElementById('shaft');
   const doorBox = document.getElementById('doorBox');
   const doorIcon = document.getElementById('doorIcon');
@@ -444,8 +611,7 @@ function setDoorStatus(state) {
   }
 }
 
-// 10. ฟังก์ชันควบคุมโหมดการทำงาน (AUTO / REMOTE)
-function setOperationMode(mode) {
+function setOperationModeUI(mode) {
   const modeBox = document.getElementById('modeBox');
   const modeIcon = document.getElementById('modeIcon');
   const modeText = document.getElementById('modeText');
@@ -457,21 +623,39 @@ function setOperationMode(mode) {
   }
 }
 
-// 11. ควบคุมไฟ LED จำลองฝั่งฮาร์ดแวร์
 function led(state) {
-  if(socket) socket.emit("led", state);
+  lifts[activeLiftId].ledState = state;
+  if(socket) socket.emit("led", { liftId: activeLiftId, state: state });
   document.getElementById('ledInd').className = state === 'ON' ? 'led-indicator active' : 'led-indicator';
 }
 
-// 12. ดักฟังอีเวนต์จากบอร์ดไมโครคอนโทรลเลอร์ (MQTT)
+// 9. ตัวรับสัญญาณเน็ตเวิร์กภายนอก (Multi-Lift MQTT Data Sync)
 if (socket) {
   socket.on("mqtt", data => {
-    if(data.topic === "home/status") setLiftStatus(data.message);
-    if(data.topic === "home/mode") setOperationMode(data.message);
-    if(data.topic === "home/door") setDoorStatus(data.message);
-    if(data.topic.startsWith("home/button")) {
-      const floor = data.topic.replace("home/button", "");
-      if(data.message === "PRESSED") executeElevatorLogic(parseInt(floor));
+    const parts = data.topic.split('/'); 
+    if (parts.length >= 3 && parts[1].startsWith("lift")) {
+      const liftId = parseInt(parts[1].replace("lift", ""));
+      const topicType = parts[2];
+      
+      if (lifts[liftId]) {
+        if (topicType === "status") {
+          lifts[liftId].systemState = data.message;
+          if (liftId === activeLiftId) setLiftStatusUI(data.message);
+        }
+        if (topicType === "mode") {
+          lifts[liftId].modeState = data.message;
+          if (liftId === activeLiftId) setOperationModeUI(data.message);
+        }
+        if (topicType === "button") {
+          let floorVal = parseInt(data.message);
+          if(!lifts[liftId].targets.includes(floorVal)) {
+             lifts[liftId].targets.push(floorVal);
+             if(liftId === activeLiftId) setButtonLightUI(floorVal, true);
+          }
+          processElevatorQueue(liftId);
+        }
+        updateOverviewCardUI(liftId);
+      }
     }
   });
 }
