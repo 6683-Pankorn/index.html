@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Elevator Group Control Dashboard - SCAN Algorithm</title>
+<title>Elevator Group Control - Energy & Traffic Analytics</title>
 <script src="/socket.io/socket.io.js" onerror="console.warn('Socket.io server not found. Running in standalone mode.')"></script>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
@@ -148,6 +148,19 @@
   .lift-btn.active { background: rgba(255, 183, 77, 0.15); border-color: var(--accent-glow); }
   .lift-btn.active span, .lift-btn.active .material-icons { color: var(--accent-glow); }
 
+  /* ================= [เพิ่มใหม่] ENERGY & TRAFFIC INSIGHTS STYLES ================= */
+  .analytics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
+  .metric-box { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px; text-align: center; }
+  .metric-val { font-size: 22px; font-weight: bold; color: var(--primary); margin-top: 4px; font-family: 'Courier New', monospace; }
+  .metric-unit { font-size: 11px; color: var(--text-muted); margin-left: 2px; }
+  
+  .rank-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+  .rank-item { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.04); padding: 6px 10px; border-radius: 6px; font-size: 12px; }
+  .rank-number { font-weight: bold; color: var(--accent-glow); width: 24px; }
+  .rank-floor { flex: 1; text-align: left; }
+  .rank-count { font-family: 'Courier New', monospace; background: rgba(77, 208, 225, 0.15); color: var(--primary); padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+  /* ============================================================================ */
+
   /* LED INTERFACE */
   .control-row { display: flex; align-items: center; justify-content: space-between; }
   .led-indicator {
@@ -174,14 +187,14 @@
 <div class="app-container">
   
   <div class="app-header">
-    <span class="material-icons">elevator</span>
-    <h2>Group Elevator Control (SCAN Algorithm Interface)</h2>
+    <span class="material-icons">analytics</span>
+    <h2>Group Elevator Intelligence Dashboard & Analytics</h2>
   </div>
 
   <div class="main-grid">
     
     <div class="card full-width-pc">
-      <h3><span class="material-icons">dashboard</span> Multi-Elevator System Overview Menu (Supports Multi-Floor Queue)</h3>
+      <h3><span class="material-icons">dashboard</span> Multi-Elevator System Overview Menu (Select to view/control)</h3>
       <div class="group-overview-grid" id="overviewGrid"></div>
     </div>
     
@@ -220,60 +233,80 @@
 
       </div>
     </div>
+
+    <div class="card">
+      <h3 class="active-lift-header-title" id="activeAnalyticsTitle"><span class="material-icons">equalizer</span> Energy & Traffic Insights: LIFT 01</h3>
+      
+      <div class="analytics-grid">
+        <div class="metric-box">
+          <div style="font-size: 11px; color: var(--text-muted);">Power Consumed</div>
+          <div class="metric-val" id="energyVal" style="color: #66bb6a;">0.00<span class="metric-unit">kWh</span></div>
+        </div>
+        <div class="metric-box">
+          <div style="font-size: 11px; color: var(--text-muted);">Electricity Cost</div>
+          <div class="metric-val" id="costVal" style="color: #ffca28;">0.00<span class="metric-unit">THB</span></div>
+        </div>
+      </div>
+
+      <div class="sim-section-title" style="margin-top: 14px; display: flex; align-items: center; gap:4px;">
+        <span class="material-icons" style="font-size:14px; color:var(--accent-glow);">local_fire_department</span> Top Visited Floors (Traffic Rank)
+      </div>
+      <div class="rank-list" id="rankListZone">
+        </div>
+    </div>
     
     <div class="card">
       <h3 class="active-lift-header-title" id="activePassengerTitle"><span class="material-icons">apps</span> Passenger Panel: LIFT 01</h3>
       <div class="button-grid" id="btnGrid"></div>
     </div>
 
-    <div style="display: flex; flex-direction: column; gap: 16px;">
-      
-      <div class="card">
-        <h3><span class="material-icons">settings_remote</span> Hardware Actuator</h3>
-        <div class="control-row">
-          <div id="ledInd" class="led-indicator"><span class="material-icons">lightbulb</span></div>
-          <div class="simple-btn-group">
-            <button class="simple-btn" onclick="led('ON')">LED ON</button>
-            <button class="simple-btn" onclick="led('OFF')">LED OFF</button>
+    <div class="card full-width-pc test-panel-card">
+        <h3 style="color: var(--accent-glow);"><span class="material-icons">bug_report</span> Presenter Simulation Tools & Operational Commands</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+          <div>
+            <div class="sim-section-title">1. System Status Control</div>
+            <div style="display: flex; gap: 8px;">
+              <button class="simple-btn" style="color: var(--success);" onclick="triggerTestStatus('Online')">Set Online</button>
+              <button class="simple-btn" style="color: var(--danger);" onclick="triggerTestStatus('Closed')">Set Closed</button>
+            </div>
+            
+            <div class="sim-section-title" style="margin-top:12px;">2. Operation Mode</div>
+            <div style="display: flex; gap: 8px;">
+              <button class="simple-btn" style="color: var(--primary);" onclick="triggerTestMode('AUTO')">Force AUTO</button>
+              <button class="simple-btn" style="color: var(--purple-mode);" onclick="triggerTestMode('REMOTE')">Force REMOTE</button>
+            </div>
+
+            <div class="sim-section-title" style="margin-top:12px;">3. Hardware Actuator</div>
+            <div class="control-row">
+              <div id="ledInd" class="led-indicator"><span class="material-icons">lightbulb</span></div>
+              <div class="simple-btn-group">
+                <button class="simple-btn" onclick="led('ON')">LED ON</button>
+                <button class="simple-btn" onclick="led('OFF')">LED OFF</button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="sim-section-title">4. Inject Floor Command (Multi-press SCAN algorithm)</div>
+            <div class="sim-grid-15">
+              <button class="sim-mini-btn" onclick="triggerTestFloor(1)">F1</button>
+              <button class="sim-mini-btn" onclick="triggerTestFloor(2)">F2</button>
+              <button class="sim-mini-btn" onclick="triggerTestFloor(3)">F3</button>
+              <button class="sim-mini-btn" onclick="triggerTestFloor(4)">F4</button>
+              <button class="sim-mini-btn" onclick="triggerTestFloor(5)">F5</button>
+              <button class="sim-mini-btn" onclick="triggerTestFloor(6)">F6</button>
+              <button class="sim-mini-btn" onclick="triggerTestFloor(7)">F7</button>
+              <button class="sim-mini-btn" onclick="triggerTestFloor(8)">F8</button>
+              <button class="sim-mini-btn" onclick="triggerTestFloor(9)">F9</button>
+              <button class="sim-mini-btn" onclick="triggerTestFloor(10)">F10</button>
+              <button class="sim-mini-btn" onclick="triggerTestFloor(11)">F11</button>
+              <button class="sim-mini-btn" onclick="triggerTestFloor(12)">F12</button>
+              <button class="sim-mini-btn" onclick="triggerTestFloor(13)">F13</button>
+              <button class="sim-mini-btn" onclick="triggerTestFloor(14)">F14</button>
+              <button class="sim-mini-btn" onclick="triggerTestFloor(15)">F15</button>
+            </div>
           </div>
         </div>
-      </div>
-
-      <div class="card test-panel-card">
-        <h3 style="color: var(--accent-glow);"><span class="material-icons">bug_report</span> Presenter Simulation Tools</h3>
-        
-        <div class="sim-section-title">1. System Operational Status</div>
-        <div style="display: flex; gap: 8px;">
-          <button class="simple-btn" style="color: var(--success);" onclick="triggerTestStatus('Online')">Set Online</button>
-          <button class="simple-btn" style="color: var(--danger);" onclick="triggerTestStatus('Closed')">Set Closed</button>
-        </div>
-
-        <div class="sim-section-title">2. Operation Mode Control</div>
-        <div style="display: flex; gap: 8px;">
-          <button class="simple-btn" style="color: var(--primary);" onclick="triggerTestMode('AUTO')">Force AUTO</button>
-          <button class="simple-btn" style="color: var(--purple-mode);" onclick="triggerTestMode('REMOTE')">Force REMOTE</button>
-        </div>
-
-        <div class="sim-section-title">3. Inject Floor Command (Multi-press supported)</div>
-        <div class="sim-grid-15">
-          <button class="sim-mini-btn" onclick="triggerTestFloor(1)">F1</button>
-          <button class="sim-mini-btn" onclick="triggerTestFloor(2)">F2</button>
-          <button class="sim-mini-btn" onclick="triggerTestFloor(3)">F3</button>
-          <button class="sim-mini-btn" onclick="triggerTestFloor(4)">F4</button>
-          <button class="sim-mini-btn" onclick="triggerTestFloor(5)">F5</button>
-          <button class="sim-mini-btn" onclick="triggerTestFloor(6)">F6</button>
-          <button class="sim-mini-btn" onclick="triggerTestFloor(7)">F7</button>
-          <button class="sim-mini-btn" onclick="triggerTestFloor(8)">F8</button>
-          <button class="sim-mini-btn" onclick="triggerTestFloor(9)">F9</button>
-          <button class="sim-mini-btn" onclick="triggerTestFloor(10)">F10</button>
-          <button class="sim-mini-btn" onclick="triggerTestFloor(11)">F11</button>
-          <button class="sim-mini-btn" onclick="triggerTestFloor(12)">F12</button>
-          <button class="sim-mini-btn" onclick="triggerTestFloor(13)">F13</button>
-          <button class="sim-mini-btn" onclick="triggerTestFloor(14)">F14</button>
-          <button class="sim-mini-btn" onclick="triggerTestFloor(15)">F15</button>
-        </div>
-      </div>
-
     </div>
 
   </div>
@@ -283,13 +316,22 @@
 let socket = null;
 if (typeof io !== 'undefined') { socket = io(); }
 
-// ================= ฐานข้อมูลเก็บอาร์เรย์คิวชั้น (targets) แยกอิสระ 5 ตัว =================
+// ค่าไฟฟ้าเฉลี่ยต่อยูนิตประเทศไทย (จำลองเอาไว้เพื่อแปลงหน่วยพลังงานเป็นเงินบาท)
+const ELECTRICITY_RATE = 4.50; 
+
+// ================= [เพิ่มฟังก์ชัน] โครงสร้างฐานข้อมูลลิฟต์ บันทึกค่าพลังงาน และ สถิติจำนวนครั้งการเข้าจอดแต่ละชั้น =================
+function createInitialFloorStats() {
+  let stats = {};
+  for(let f=1; f<=15; f++) { stats[f] = 0; }
+  return stats;
+}
+
 let lifts = {
-  1: { currentFloor: 1,  targets: [], isMoving: false, systemState: "Online", doorState: "CLOSED", movementDirection: null, movementTimer: null, ledState: "OFF", modeState: "AUTO" },
-  2: { currentFloor: 3,  targets: [], isMoving: false, systemState: "Online", doorState: "CLOSED", movementDirection: null, movementTimer: null, ledState: "OFF", modeState: "AUTO" },
-  3: { currentFloor: 7,  targets: [], isMoving: false, systemState: "Closed", doorState: "CLOSED", movementDirection: null, movementTimer: null, ledState: "OFF", modeState: "AUTO" },
-  4: { currentFloor: 11, targets: [], isMoving: false, systemState: "Online", doorState: "CLOSED", movementDirection: null, movementTimer: null, ledState: "OFF", modeState: "AUTO" },
-  5: { currentFloor: 15, targets: [], isMoving: false, systemState: "Online", doorState: "CLOSED", movementDirection: null, movementTimer: null, ledState: "OFF", modeState: "AUTO" }
+  1: { currentFloor: 1,  targets: [], isMoving: false, systemState: "Online", doorState: "CLOSED", movementDirection: null, movementTimer: null, ledState: "OFF", modeState: "AUTO", energyUsed: 0.00, floorStats: createInitialFloorStats() },
+  2: { currentFloor: 3,  targets: [], isMoving: false, systemState: "Online", doorState: "CLOSED", movementDirection: null, movementTimer: null, ledState: "OFF", modeState: "AUTO", energyUsed: 0.00, floorStats: createInitialFloorStats() },
+  3: { currentFloor: 7,  targets: [], isMoving: false, systemState: "Closed", doorState: "CLOSED", movementDirection: null, movementTimer: null, ledState: "OFF", modeState: "AUTO", energyUsed: 0.00, floorStats: createInitialFloorStats() },
+  4: { currentFloor: 11, targets: [], isMoving: false, systemState: "Online", doorState: "CLOSED", movementDirection: null, movementTimer: null, ledState: "OFF", modeState: "AUTO", energyUsed: 0.00, floorStats: createInitialFloorStats() },
+  5: { currentFloor: 15, targets: [], isMoving: false, systemState: "Online", doorState: "CLOSED", movementDirection: null, movementTimer: null, ledState: "OFF", modeState: "AUTO", energyUsed: 0.00, floorStats: createInitialFloorStats() }
 };
 
 let activeLiftId = 1;
@@ -327,6 +369,7 @@ function switchActiveLift(liftId) {
   
   document.getElementById('activeMonitorTitle').innerHTML = `<span class="material-icons">visibility</span> Real-time Status Monitor: LIFT 0${liftId}`;
   document.getElementById('activePassengerTitle').innerHTML = `<span class="material-icons">apps</span> Passenger Panel: LIFT 0${liftId}`;
+  document.getElementById('activeAnalyticsTitle').innerHTML = `<span class="material-icons">equalizer</span> Energy & Traffic Insights: LIFT 0${liftId}`;
   
   syncDetailedPanelUI();
 }
@@ -345,8 +388,6 @@ function updateOverviewCardUI(id) {
   else dirIcon = `<span class="material-icons" style="color:#555;">horizontal_rule</span>`;
   
   let doorIcon = lift.doorState === "OPEN" ? "door_open" : "door_front";
-
-  // เพิ่มการแสดงผลจำนวนคิวชั้นที่ค้างอยู่เบาๆ ข้างไอคอน
   let queueCount = lift.targets.length > 0 ? `<span style="font-size:10px; color:var(--primary); font-weight:bold;">(${lift.targets.length}Q)</span>` : "";
 
   card.innerHTML = `
@@ -364,7 +405,7 @@ function updateOverviewCardUI(id) {
   `;
 }
 
-// 5. ซิงค์ค่าแผงคุมด้านล่าง
+// 5. ซิงค์ค่าแผงคุมย่อยด้านล่างและแผงข้อมูลวิเคราะห์พลังงาน
 function syncDetailedPanelUI() {
   const lift = lifts[activeLiftId];
   const display = document.getElementById('floorNum');
@@ -374,28 +415,66 @@ function syncDetailedPanelUI() {
   setDoorStatusUI(lift.doorState);
   setOperationModeUI(lift.modeState);
   
-  // ซิงค์ปุ่มกดทั้งหมดตามคิวที่มีอยู่ในอาเรย์ targets 
   for (let i = 1; i <= 15; i++) {
     setButtonLightUI(i, lift.targets.includes(i));
   }
   document.getElementById('ledInd').className = lift.ledState === 'ON' ? 'led-indicator active' : 'led-indicator';
+
+  // [เรียกทำงานเพิ่มใหม่] ดึงข้อมูลสถิติพลังงานและขอบเขต Traffic ของตัวเลขชั้นออกมาวาดใหม่
+  updateInsightsUI();
 }
 
-// 6. เมื่อผู้โดยสารกดแผงคุมหลัก
+// [ฟังก์ชันเพิ่มใหม่] 6. ตัวคำนวณและประมวลผลการจัดอันดับ Traffic (Top Visited Floors) พร้อมแสดงผลข้อมูลไฟ
+function updateInsightsUI() {
+  const lift = lifts[activeLiftId];
+  
+  // แสดงผลค่าไฟสะสม
+  document.getElementById('energyVal').innerHTML = `${lift.energyUsed.toFixed(2)}<span class="metric-unit">kWh</span>`;
+  document.getElementById('costVal').innerHTML = `${(lift.energyUsed * ELECTRICITY_RATE).toFixed(2)}<span class="metric-unit">THB</span>`;
+  
+  // นำออบเจ็กต์สถิติจำนวนครั้งมาเรียง Array เพื่อค้นหา Top 3 
+  let sortedFloors = [];
+  for (let f in lift.floorStats) {
+    sortedFloors.push({ floor: f, count: lift.floorStats[f] });
+  }
+  // เรียงลำดับจากมากสุดไปหาน้อยสุด
+  sortedFloors.sort((a, b) => b.count - a.count);
+  
+  const rankListZone = document.getElementById('rankListZone');
+  rankListZone.innerHTML = ""; // ล้างค่าเก่าออกก่อน
+  
+  // แสดงผลเฉพาะ 3 อันดับแรกที่มีการใช้บริการเยอะที่สุด
+  let displayCount = 0;
+  for (let i = 0; i < sortedFloors.length; i++) {
+    if (displayCount >= 3) break;
+    
+    // แสดงผลข้อมูลชั้นที่มีคนจอดแล้วอย่างน้อย 1 ครั้งขึ้นไป เพื่อความสมจริง
+    let item = sortedFloors[i];
+    let floorName = item.floor < 10 ? '0' + item.floor : item.floor;
+    
+    const row = document.createElement('div');
+    row.className = "rank-item";
+    row.innerHTML = `
+      <span class="rank-number">#${displayCount + 1}</span>
+      <span class="rank-floor">Floor ${floorName}</span>
+      <span class="rank-count">${item.count} Stops</span>
+    `;
+    rankListZone.appendChild(row);
+    displayCount++;
+  }
+}
+
+// 7. เมื่อผู้โดยสารกดเลือกชั้นบน Dashboard
 function passengerPressFloor(floor) {
   let lift = lifts[activeLiftId];
   if (lift.systemState !== "Online") {
     alert(`ลิฟต์ LIFT 0${activeLiftId} ปิดให้บริการอยู่`);
     return;
   }
-  
-  // กดชั้นที่อยู่ปัจจุบัน และลิฟต์ไม่ได้วิ่งอยู่ ให้เปิดประตูทันที
   if (lift.currentFloor === floor && !lift.isMoving) {
     handleDoorCycle(activeLiftId);
     return;
   }
-
-  // เพิ่มเข้าคิวกรณีที่ยังไม่มีในอาร์เรย์คิว
   if (!lift.targets.includes(floor)) {
     lift.targets.push(floor);
     if (activeLiftId === activeLiftId) setButtonLightUI(floor, true);
@@ -403,12 +482,10 @@ function passengerPressFloor(floor) {
   }
   
   if(socket) socket.emit("mqtt", { topic: `home/lift${activeLiftId}/button`, message: floor.toString() });
-  
-  // เรียกเครื่องยนต์คำนวณสมาร์ทคิว SCAN Algorithm
   processElevatorQueue(activeLiftId);
 }
 
-// 7. ปุ่มกดแผงทดสอบผู้บรรยาย
+// 8. กลไกจำลองคำสั่งฝั่งแผงจำลองทดสอบของผู้บรรยาย
 function triggerTestFloor(floor) {
   let lift = lifts[activeLiftId];
   lift.modeState = 'REMOTE';
@@ -420,7 +497,6 @@ function triggerTestFloor(floor) {
     handleDoorCycle(activeLiftId);
     return;
   }
-
   if (!lift.targets.includes(floor)) {
     lift.targets.push(floor);
     setButtonLightUI(floor, true);
@@ -450,11 +526,10 @@ function triggerTestMode(mode) {
   if(socket) socket.emit("mqtt", { topic: `home/lift${activeLiftId}/mode`, message: mode });
 }
 
-// ================= 8. เครื่องยนต์หลัก SCAN Algorithm (Intelligent Core) =================
+// ================= 9. SCAN Algorithm Core พร้อมฟังก์ชันคำนวณสูตรไฟฟ้า =================
 function processElevatorQueue(liftId) {
   let lift = lifts[liftId];
   
-  // ไม่มีคิวเหลืออยู่เลย -> จอดสแตนด์บาย
   if (lift.targets.length === 0) {
     lift.isMoving = false;
     lift.movementDirection = null;
@@ -463,87 +538,85 @@ function processElevatorQueue(liftId) {
     return;
   }
 
-  // หากลิฟต์กำลังขยับวิ่งสแกนชั้นอยู่แล้ว ปล่อยให้ลูปเดิมทำงานต่อ (ลูปจะเห็นค่าคิวใหม่เองอัตโนมัติ)
   if (lift.isMoving) return; 
 
   lift.isMoving = true;
-  setDoorStatusLogic(liftId, "CLOSED"); // สั่งปิดประตูก่อนออกตัว
+  setDoorStatusLogic(liftId, "CLOSED");
 
-  // หน่วงเวลาสไลด์ปิดประตู 0.6 วินาที ก่อนเริ่มรันลูปไต่ชั้น
   setTimeout(() => {
     if (lift.movementTimer) clearInterval(lift.movementTimer);
 
     lift.movementTimer = setInterval(() => {
       
-      // คอนเซปต์เด็ด SCAN: ตัดสินใจทิศทาง (เรียงลำดับความสำคัญของชั้น)
+      // การเลือกเป้าหมายตามทิศทาง SCAN
       if (!lift.movementDirection) {
-        // หากจอดนิ่งอยู่แล้วเพิ่งเริ่มขยับ ให้วิ่งไปหาเป้าหมายแรกในคิว
         lift.movementDirection = lift.targets[0] > lift.currentFloor ? "UP" : "DOWN";
       } else {
-        // หากกำลังเคลื่อนที่อยู่ ให้เช็คว่าทางข้างหน้ายังมีเป้าหมายหลงเหลืออยู่ไหม
         let hasTargetsAhead = false;
         if (lift.movementDirection === "UP") {
           hasTargetsAhead = lift.targets.some(f => f > lift.currentFloor);
-          // ถ้าทางข้างบนหมดคิวแล้ว แต่มีคิวค้างอยู่ทางด้านล่าง -> ให้ทำการกลับทิศทางรถลิฟต์ลง
           if (!hasTargetsAhead && lift.targets.some(f => f < lift.currentFloor)) {
             lift.movementDirection = "DOWN";
           }
         } else if (lift.movementDirection === "DOWN") {
           hasTargetsAhead = lift.targets.some(f => f < lift.currentFloor);
-          // ถ้าทางข้างล่างเคลียร์หมดคิวแล้ว แต่มีคิวค้างอยู่ด้านบน -> กลับทิศทางขึ้นข้างบน
           if (!hasTargetsAhead && lift.targets.some(f => f > lift.currentFloor)) {
             lift.movementDirection = "UP";
           }
         }
       }
 
-      // อัปเดต UI ทิศทางลูกศร
       if (liftId === activeLiftId) updateDirectionIndicatorUI(lift.movementDirection);
       updateOverviewCardUI(liftId);
 
-      // เริ่มทำการเขยิบชั้นตามทิศทางสแกนที่คำนวณได้
+      // เริ่มสไลด์เคลื่อนที่ข้ามชั้น
       if (lift.movementDirection === "UP") lift.currentFloor++;
       if (lift.movementDirection === "DOWN") lift.currentFloor--;
 
-      // แสดงผลตัวเลขหน้าปัดตามเวลาจริงขณะเลื่อนผ่านชั้นระหว่างทาง
+      // [คำนวณพลังงานไฟฟ้า] มอเตอร์ลิฟต์ทำงานเคลื่อนย้ายน้ำหนัก: กินไฟเพิ่มขึ้น 0.05 kWh ต่อการเลื่อนผ่าน 1 ชั้น
+      lift.energyUsed += 0.05; 
+
       if (liftId === activeLiftId) {
         document.getElementById('floorNum').innerText = lift.currentFloor < 10 ? '0' + lift.currentFloor : lift.currentFloor;
+        // อัปเดตตารางสรุปพลังงานสดๆ ทุกวินาทีที่มันขยับชั้น
+        updateInsightsUI(); 
       }
       updateOverviewCardUI(liftId);
 
-      // เช็คว่าชั้นระหว่างทางที่สไลด์มาถึงนี้ ตรงกับชั้นใดๆ ในคิวผู้โดยสารหรือไม่ (Interception check)
+      // ตรวจจับการเข้าจอดเทียบชั้นเป้าหมาย
       let targetIndex = lift.targets.indexOf(lift.currentFloor);
       if (targetIndex !== -1) {
-        // เจอชั้นเป้าหมาย! -> สั่งเบรกจอดทันที
         clearInterval(lift.movementTimer);
         lift.movementTimer = null;
         
-        // ลบชั้นนี้ออกจากอาร์เรย์รายการคิว
         lift.targets.splice(targetIndex, 1);
         
-        // เข้าสู่วงจรเปิดประตูส่งผู้โดยสาร
+        // [บันทึกข้อมูลสถิติ] เพิ่มจำนวนครั้งสะสมที่ลิฟต์ตัวนี้เข้ามาจอดที่ชั้นปัจจุบัน
+        lift.floorStats[lift.currentFloor]++; 
+        
         handleDoorCycle(liftId, () => {
-          // Callback: เมื่อประตูสไลด์ปิดสนิทเรียบร้อยแล้ว ให้สั่งประมวลคิวต่อทันที (Recursive Resume)
           lift.isMoving = false;
           processElevatorQueue(liftId);
         });
       }
 
-    }, 1000); // ความเร็วไต่ระดับทีละ 1 ชั้นต่อวินาที
+    }, 1000); 
   }, 600);
 }
 
-// ฟังก์ชันดูแลวงจรเปิด-ปิดประตูพร้อมรับคำสั่ง Callback เมื่อปิดจบขั้นตอน
 function handleDoorCycle(liftId, onComplete) {
   setDoorStatusLogic(liftId, "OPEN");
+  
+  // [คำนวณพลังงานไฟฟ้า] มอเตอร์สไลด์บานประตู และระบบม่านแสงอินฟราเรดเปิดทำงาน: กินไฟเพิ่มอีก 0.02 kWh
+  lifts[liftId].energyUsed += 0.02; 
+  
   if (liftId === activeLiftId) {
-    setButtonLightUI(lifts[liftId].currentFloor, false); // ดับไฟปุ่มกดเฉพาะชั้นที่ถึงแล้ว
+    setButtonLightUI(lifts[liftId].currentFloor, false);
+    updateInsightsUI(); // ซิงค์การ์ดข้อมูล
   }
   
-  // ค้างประตูไว้ 3 วินาทีแล้วสั่งสไลด์ปิดกลับมา
   setTimeout(() => {
     setDoorStatusLogic(liftId, "CLOSED");
-    // รอระบบประตูสไลด์ปิดทางกายภาพเสร็จสิ้น (600ms) จากนั้นยิงลูปคำสั่งออกเดินทางต่อไป
     setTimeout(() => {
       if (onComplete) onComplete();
     }, 600);
@@ -629,7 +702,7 @@ function led(state) {
   document.getElementById('ledInd').className = state === 'ON' ? 'led-indicator active' : 'led-indicator';
 }
 
-// 9. ตัวรับสัญญาณเน็ตเวิร์กภายนอก (Multi-Lift MQTT Data Sync)
+// 10. ระบบดักฟังจากเครือข่ายจำลองภายนอก (Multi-Lift MQTT Data Sync)
 if (socket) {
   socket.on("mqtt", data => {
     const parts = data.topic.split('/'); 
